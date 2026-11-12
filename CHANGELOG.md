@@ -1,6 +1,6 @@
 ---
 changelogVersion: 1
-plugin: "changeyu0229_luma"
+plugin: "byaiden_luma"
 version: "1.0.0"
 locale: "en"
 translations:

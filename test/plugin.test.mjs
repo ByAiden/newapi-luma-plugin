@@ -30,8 +30,8 @@ function credits(body) {
 
 test("manifest follows the community rules", () => {
   assert.equal(meta.apiVersion, 1);
-  assert.equal(meta.key, "changeyu0229_luma");
-  assert.match(meta.key, /^changeyu0229_[a-z0-9_]+$/);
+  assert.equal(meta.key, "byaiden_luma");
+  assert.match(meta.key, /^byaiden_[a-z0-9_]+$/);
   assert.ok(meta.key.length <= 30);
   assert.match(meta.version, /^\d+\.\d+\.\d+$/);
   assert.equal(meta.baseUrl, BASE);

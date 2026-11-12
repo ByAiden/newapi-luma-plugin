@@ -50,7 +50,7 @@ const MAX_CREDITS = 4320;
 
 export const meta = {
   "apiVersion": 1,
-  "key": "changeyu0229_luma",
+  "key": "byaiden_luma",
   "name": "Luma",
   "icon": "Luma.Color",
   "description": {
@@ -59,8 +59,8 @@ export const meta = {
   },
   "version": "1.0.0",
   "author": {
-    "name": "ChangeYu0229",
-    "url": "https://github.com/ChangeYu0229"
+    "name": "ByAiden",
+    "url": "https://github.com/ByAiden"
   },
   "website": "https://docs.agents.lumalabs.ai/",
   "baseUrl": "https://agents.lumalabs.ai",

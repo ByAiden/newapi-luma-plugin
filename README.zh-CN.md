@@ -9,7 +9,7 @@ locale: zh-CN
 
 ## 渠道设置
 
-- 安装插件后，新建“任务插件”类型的渠道，并绑定 `changeyu0229_luma`。
+- 安装插件后，新建“任务插件”类型的渠道，并绑定 `byaiden_luma`。
 - 密钥填 [Luma API Platform](https://platform.lumalabs.ai/) 里创建的 Luma Agents API Key，以 `luma-api-` 开头。同一个 Key 可同时调用视频和图片模型。
 - API 地址留空即使用 `https://agents.lumalabs.ai`。只有通过代理访问 Luma 时才需要填写，末尾不要带 `/v1`。
 - 渠道模型里加入要提供的模型：`ray-3.2`、`uni-1`、`uni-1-max`。也可以通过模型映射用其他名字对外提供。
@@ -25,7 +25,7 @@ locale: zh-CN
 | `POST /v1/images/generations` | OpenAI 图片接口：`prompt`、`size`、`output_format`，另支持 Luma 的 `aspect_ratio`、`style`、`web_search`、`image_ref` | `uni-1`、`uni-1-max` |
 | `POST /v1/images/edits` | OpenAI 改图接口：第一张 `image` 是要修改的图，其余作为参考图 | `uni-1`、`uni-1-max` |
 
-Luma 路径也可以加插件前缀访问，即 `/changeyu0229_luma/v1/generations`。不写 `type` 时，`ray-3.2` 默认生成视频，`uni-1`、`uni-1-max` 默认生成图片；使用映射后的模型名时必须写明 `type`。
+Luma 路径也可以加插件前缀访问，即 `/byaiden_luma/v1/generations`。不写 `type` 时，`ray-3.2` 默认生成视频，`uni-1`、`uni-1-max` 默认生成图片；使用映射后的模型名时必须写明 `type`。
 
 通过 Luma 路径提交的任务，客户端轮询 `GET /v1/generations/{id}`。返回 Luma 的 generation 对象；完成后每个 `output[].url` 都是网关的下载地址，Luma 自己的链接一小时后过期，网关地址仍然可用。返回内容不包含 Luma 的团队和用量信息。
 通过 `POST /v1/videos` 提交的任务，客户端轮询 `GET /v1/videos/{task_id}`，从 `GET /v1/videos/{task_id}/content` 下载视频。OpenAI 图片接口会等图片生成完再返回图片地址；请求里设置 `response_format: "b64_json"` 时返回 base64 数据。
