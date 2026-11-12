@@ -343,3 +343,11 @@ test("manifest binds each protocol to its models", () => {
   assert.deepEqual(meta.models, ["ray-3.2", "uni-1", "uni-1-max"]);
   assert.deepEqual(meta.protocols, [{ name: "openai_video", models: ["ray-3.2"] }, { name: "openai_image", models: ["uni-1", "uni-1-max"] }]);
 });
+
+test("meta is a JSON object literal the marketplace can read without running the plugin", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../plugin.js", import.meta.url), "utf8");
+  const start = source.indexOf("export const meta = ") + "export const meta = ".length;
+  const literal = source.slice(start, source.indexOf(";\n", start));
+  assert.deepEqual(JSON.parse(literal), JSON.parse(JSON.stringify(meta)));
+});

@@ -48,49 +48,130 @@ const IMAGE_BASE_CREDITS = { "uni-1": 14, "uni-1-max": 34 };
 // The highest credit count one task can cost: a 10-second 1080p HDR + EXR edit.
 const MAX_CREDITS = 4320;
 
-const USAGE_SCHEMA = {
-  credits: {
-    type: "number",
-    unit: "credit",
-    description: { en: "Luma credit unit price", zh: "Luma 积分单价" },
-  },
-};
-
 export const meta = {
-  apiVersion: 1,
-  key: "changeyu0229_luma",
-  name: "Luma",
-  icon: "Luma.Color",
-  description: {
-    en: "Luma Ray 3.2 video (text-to-video, image-to-video, keyframes, extension, editing, and reframing) and uni-1 image generation and editing",
-    zh: "Luma Ray 3.2 视频（文生视频、图生视频、关键帧、视频延长、视频编辑、画幅重构）与 uni-1 图片生成和编辑",
+  "apiVersion": 1,
+  "key": "changeyu0229_luma",
+  "name": "Luma",
+  "icon": "Luma.Color",
+  "description": {
+    "en": "Luma Ray 3.2 video (text-to-video, image-to-video, keyframes, extension, editing, and reframing) and uni-1 image generation and editing",
+    "zh": "Luma Ray 3.2 视频（文生视频、图生视频、关键帧、视频延长、视频编辑、画幅重构）与 uni-1 图片生成和编辑"
   },
-  version: "1.0.0",
-  author: { name: "ChangeYu0229", url: "https://github.com/ChangeYu0229" },
-  website: "https://docs.agents.lumalabs.ai/",
-  baseUrl: "https://agents.lumalabs.ai",
-  models: ALL_MODELS,
-  fetchMode: "per_task",
-  usageSchema: USAGE_SCHEMA,
-  usageExamples: [
-    { label: "video 720p 5s", facts: { credits: 100 } },
-    { label: "video 1080p 10s", facts: { credits: 1200 } },
-    { label: "video 1080p 5s HDR", facts: { credits: 800 } },
-    { label: "video extend 720p", facts: { credits: 100 } },
-    { label: "video edit 720p 10s", facts: { credits: 720 } },
-    { label: "video reframe 720p 5s", facts: { credits: 200 } },
-    { label: "uni-1 image", facts: { credits: 14 } },
-    { label: "uni-1 edit · 2 refs", facts: { credits: 17 } },
-    { label: "uni-1-max image", facts: { credits: 34 } },
+  "version": "1.0.0",
+  "author": {
+    "name": "ChangeYu0229",
+    "url": "https://github.com/ChangeYu0229"
+  },
+  "website": "https://docs.agents.lumalabs.ai/",
+  "baseUrl": "https://agents.lumalabs.ai",
+  "models": [
+    "ray-3.2",
+    "uni-1",
+    "uni-1-max"
   ],
-  routes: [
-    { method: "POST", path: "/v1/generations", type: "submit", decode: "createGeneration", render: "generationCreated", models: ALL_MODELS },
-    { method: "GET", path: "/v1/generations/:generation_id", type: "query", taskIdParam: "generation_id", render: "generationStatus" },
+  "fetchMode": "per_task",
+  "usageSchema": {
+    "credits": {
+      "type": "number",
+      "unit": "credit",
+      "description": {
+        "en": "Luma credit unit price",
+        "zh": "Luma 积分单价"
+      }
+    }
+  },
+  "usageExamples": [
+    {
+      "label": "video 720p 5s",
+      "facts": {
+        "credits": 100
+      }
+    },
+    {
+      "label": "video 1080p 10s",
+      "facts": {
+        "credits": 1200
+      }
+    },
+    {
+      "label": "video 1080p 5s HDR",
+      "facts": {
+        "credits": 800
+      }
+    },
+    {
+      "label": "video extend 720p",
+      "facts": {
+        "credits": 100
+      }
+    },
+    {
+      "label": "video edit 720p 10s",
+      "facts": {
+        "credits": 720
+      }
+    },
+    {
+      "label": "video reframe 720p 5s",
+      "facts": {
+        "credits": 200
+      }
+    },
+    {
+      "label": "uni-1 image",
+      "facts": {
+        "credits": 14
+      }
+    },
+    {
+      "label": "uni-1 edit, 2 refs",
+      "facts": {
+        "credits": 17
+      }
+    },
+    {
+      "label": "uni-1-max image",
+      "facts": {
+        "credits": 34
+      }
+    }
   ],
-  protocols: [
-    { name: "openai_video", models: VIDEO_MODELS },
-    { name: "openai_image", models: IMAGE_MODELS },
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/v1/generations",
+      "type": "submit",
+      "decode": "createGeneration",
+      "render": "generationCreated",
+      "models": [
+        "ray-3.2",
+        "uni-1",
+        "uni-1-max"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/generations/:generation_id",
+      "type": "query",
+      "taskIdParam": "generation_id",
+      "render": "generationStatus"
+    }
   ],
+  "protocols": [
+    {
+      "name": "openai_video",
+      "models": [
+        "ray-3.2"
+      ]
+    },
+    {
+      "name": "openai_image",
+      "models": [
+        "uni-1",
+        "uni-1-max"
+      ]
+    }
+  ]
 };
 
 function trimmed(value) {
