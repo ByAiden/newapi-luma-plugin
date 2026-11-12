@@ -34,7 +34,6 @@ test("manifest follows the community rules", () => {
   assert.match(meta.key, /^changeyu0229_[a-z0-9_]+$/);
   assert.ok(meta.key.length <= 30);
   assert.match(meta.version, /^\d+\.\d+\.\d+$/);
-  assert.deepEqual(meta.models, ["ray-3.2"]);
   assert.equal(meta.baseUrl, BASE);
   for (const example of meta.usageExamples) assert.deepEqual(Object.keys(example.facts), Object.keys(meta.usageSchema));
   assert.ok(!JSON.stringify(meta.description).includes("$"));
@@ -131,20 +130,26 @@ test("refused fields and bad input", () => {
   assert.throws(() => decodeNative({ model: "ray-3.2", prompt: "x", callback_url: "https://me" }), /callback_url/);
   assert.throws(() => decodeNative({ model: "ray-3.2", prompt: "x", video: { start_frame: { file_id: "f" } } }), /file_id/);
   assert.throws(() => decodeNative({ model: "ray-3.2", prompt: "x", image_ref: [] }), /image_ref/);
-  assert.throws(() => decodeNative({ model: "ray-3.2", type: "image", prompt: "x" }), /type must be one of/);
+  assert.throws(() => decodeNative({ model: "uni-1", type: "layering", prompt: "x", source: "https://a/1.png" }), /type must be one of/);
+  assert.throws(() => decodeNative({ model: "ray-3.2", type: "image", prompt: "x" }), /ray-3.2 takes type/);
+  assert.throws(() => decodeNative({ model: "ray-3.2", prompt: "x", style: "manga" }), /only valid for image types/);
   assert.throws(() => decodeNative({ model: "ray-3.2" }), /prompt is required/);
   assert.throws(() => decodeNative({ model: "ray-3.2", prompt: "x".repeat(6001) }), /6000/);
   assert.throws(() => decodeNative({ prompt: "x" }), /model is required/);
-  const dropped = decodeNative({ model: "ray-3.2", prompt: "x", output_format: "png", web_search: true });
-  assert.equal(dropped.requestBody.output_format, undefined);
-  assert.equal(dropped.requestBody.web_search, undefined);
+  const dropped = decodeNative({ model: "ray-3.2", prompt: "x", seed: 7, extra: { a: 1 } });
+  assert.equal(dropped.requestBody.seed, undefined);
+  assert.equal(dropped.requestBody.extra, undefined);
 });
 
 test("a mapped model sends ray-3.2 upstream and keeps the alias", () => {
-  const intent = decodeNative({ model: "luma-video", prompt: "x" });
+  assert.throws(() => decodeNative({ model: "luma-video", prompt: "x" }), /type is required/);
+  const intent = decodeNative({ model: "luma-video", type: "video", prompt: "x" });
   const request = plugin.buildSubmitRequest(driver(intent, { model: "luma-video", upstreamModel: "ray-3.2" }));
   assert.equal(request.body.model, "ray-3.2");
   assert.throws(() => plugin.buildSubmitRequest(driver(intent, { model: "luma-video", upstreamModel: "ray-2" })), /not a supported/);
+  assert.throws(() => plugin.buildSubmitRequest(driver(intent, { model: "luma-video", upstreamModel: "uni-1" })), /uni-1 takes type/);
+  const image = decodeNative({ model: "luma-image", type: "image", prompt: "x" });
+  assert.equal(plugin.extractUsage(driver(image, { model: "luma-image", upstreamModel: "uni-1-max" })).credits, 34);
 });
 
 const COMPLETED = {
@@ -252,4 +257,89 @@ test("hooks leave their arguments unchanged", () => {
   plugin.buildSubmitRequest(driver(intent, { originTasks: [{ taskId: "task_a", upstreamTaskId: "luma-a" }] }));
   assert.equal(JSON.stringify(body), frozen);
   assert.equal(intent.requestBody.video.start_frame.generation_id, "task_a");
+});
+
+const IMAGE_DONE = {
+  id: "luma-img",
+  type: "image",
+  state: "completed",
+  model: "uni-1",
+  output: [{ type: "image", url: "https://storage.cdn-luma.com/out.png?X-Amz-Expires=3600" }],
+  usage: { credits_charged: 14 },
+  team: { id: "t", name: "Gateway Team" },
+};
+
+test("images: generation, references and edits", () => {
+  const plain = decodeNative({ model: "uni-1", prompt: "A cat" });
+  assert.equal(plain.action, "text_to_image");
+  const request = plugin.buildSubmitRequest(driver(plain));
+  assert.deepEqual(request.body, { model: "uni-1", type: "image", prompt: "A cat" });
+  assert.equal(plugin.extractUsage(driver(plain)).credits, 14);
+  const refs = decodeNative({ model: "uni-1-max", prompt: "x", aspect_ratio: "2:3", style: "manga", output_format: "jpg", web_search: true, image_ref: ["https://a/1.png", { data: "aGk=", media_type: "image/png" }] });
+  assert.equal(refs.action, "image_reference");
+  assert.equal(refs.requestBody.output_format, "jpeg");
+  assert.equal(plugin.extractUsage(driver(refs)).credits, 36);
+  const edit = decodeNative({ model: "uni-1", type: "image_edit", prompt: "sunset sky", source: { generation_id: "task_img" }, image_ref: ["https://a/r.png", "https://a/s.png"] });
+  assert.equal(edit.action, "image_edit");
+  assert.deepEqual(edit.originTaskIds, ["task_img"]);
+  assert.equal(plugin.extractUsage(driver(edit)).credits, 17);
+  const sent = plugin.buildSubmitRequest(driver(edit, { originTasks: [{ taskId: "task_img", upstreamTaskId: "luma-img" }] }));
+  assert.deepEqual(sent.body.source, { generation_id: "luma-img" });
+  assert.equal(sent.body.video, undefined);
+  const max = Array.from({ length: 9 }, (_, i) => "https://a/" + i + ".png");
+  assert.equal(credits({ model: "uni-1-max", prompt: "x", image_ref: max }), 43);
+  assert.throws(() => decodeNative({ model: "uni-1", type: "image_edit", prompt: "x", source: "https://a/1.png", image_ref: max }), /at most 8/);
+  assert.throws(() => decodeNative({ model: "uni-1", prompt: "x", style: "manga", aspect_ratio: "16:9" }), /portrait/);
+  assert.throws(() => decodeNative({ model: "uni-1", type: "image_edit", prompt: "x" }), /source is required/);
+  assert.throws(() => decodeNative({ model: "uni-1", prompt: "x", source: "https://a/1.png" }), /only valid for image_edit/);
+  assert.throws(() => decodeNative({ model: "uni-1", prompt: "x", image_ref: [{ generation_id: "t" }] }), /generation_id/);
+  assert.throws(() => decodeNative({ model: "uni-1", prompt: "x", video: { resolution: "720p" } }), /video types/);
+  assert.throws(() => decodeNative({ model: "uni-1", type: "video", prompt: "x" }), /uni-1 takes type/);
+  assert.throws(() => decodeNative({ model: "uni-1", prompt: "x", output_format: "webp" }), /output_format/);
+});
+
+test("images: poll, artifacts, native view and download", () => {
+  assert.deepEqual(plugin.parseTaskResult({}, IMAGE_DONE, { status: 200 }), { status: "SUCCESS" });
+  assert.deepEqual(plugin.extractUsageOnComplete({}, {}, IMAGE_DONE), { credits: 14 });
+  assert.deepEqual(plugin.listArtifacts({ status: "SUCCESS", data: IMAGE_DONE }), [{ key: "image-1", type: "image", mimeType: "image/png" }]);
+  const view = native.generationStatus({ artifacts: { "image-1": { url: "https://gw/a/image-1" } } }, { task_id: "task_i", status: "SUCCESS", data: IMAGE_DONE });
+  assert.equal(view.output[0].url, "https://gw/a/image-1");
+  assert.equal(view.team, undefined);
+  fetchImpl = () => ({ status: 200, headers: {}, body: Object.assign({}, IMAGE_DONE, { output: [{ type: "image", url: "https://storage.cdn-luma.com/fresh.png" }] }) });
+  const ctx = { artifactKey: "image-1", data: IMAGE_DONE, upstreamTaskId: "luma-img", baseUrl: BASE, apiKey: "k", clientRequest: { method: "GET", headers: {} } };
+  assert.equal(plugin.buildContentRequest(ctx).url, "https://storage.cdn-luma.com/fresh.png");
+  assert.throws(() => plugin.buildContentRequest(Object.assign({}, ctx, { artifactKey: "video" })), /artifact_not_found/);
+});
+
+test("OpenAI Images API", () => {
+  const decode = (operation, body) => protocols.openai_image.decodeRequest({ protocol: "openai_image", operation, model: "uni-1", stream: false, method: "POST", path: "/v1/images", params: {}, query: {}, requestHeaders: {}, body });
+  const gen = decode("generate", { kind: "json", value: { model: "uni-1", prompt: "A fox", size: "1536x1024", n: 1, response_format: "b64_json", quality: "high" } });
+  assert.equal(gen.action, "text_to_image");
+  assert.deepEqual(gen.requestBody, { model: "uni-1", type: "image", prompt: "A fox", aspect_ratio: "3:2" });
+  assert.equal(decode("generate", { kind: "json", value: { prompt: "x", size: "auto" } }).requestBody.aspect_ratio, undefined);
+  assert.throws(() => decode("generate", { kind: "json", value: { prompt: "x", n: 2 } }), /n must be 1/);
+  assert.throws(() => decode("generate", { kind: "json", value: { prompt: "x", image: "https://a/1.png" } }), /only valid on/);
+  const jsonEdit = decode("edit", { kind: "json", value: { prompt: "x", images: [{ image_url: "https://a/1.png" }, { image_url: "https://a/2.png" }] } });
+  assert.equal(jsonEdit.action, "image_edit");
+  assert.deepEqual(jsonEdit.requestBody.source, { url: "https://a/1.png" });
+  assert.deepEqual(jsonEdit.requestBody.image_ref, [{ url: "https://a/2.png" }]);
+  assert.equal(plugin.extractUsage(driver(jsonEdit)).credits, 16);
+  const multipart = decode("edit", {
+    kind: "multipart",
+    fields: { prompt: ["make it night"] },
+    files: [
+      { ref: "request_file:image[]", field: "image[]", filename: "a.png", mimeType: "image/png", size: 1 },
+      { ref: "request_file:image[]#1", field: "image[]", filename: "b.jpg", mimeType: "image/jpeg", size: 1 },
+    ],
+  });
+  assert.deepEqual(multipart.requestBody.source, { data: { __fileRef: "request_file:image[]", encoding: "base64" }, media_type: "image/png" });
+  assert.equal(multipart.requestBody.image_ref.length, 1);
+  assert.throws(() => decode("edit", { kind: "json", value: { prompt: "x" } }), /image is required/);
+  assert.throws(() => decode("edit", { kind: "multipart", fields: { prompt: ["x"], mask: ["m"] }, files: [] }), /mask/);
+  assert.deepEqual(protocols.openai_image.render({}, { status: "SUCCESS", data: IMAGE_DONE }), { data: [{ url: IMAGE_DONE.output[0].url }] });
+});
+
+test("manifest binds each protocol to its models", () => {
+  assert.deepEqual(meta.models, ["ray-3.2", "uni-1", "uni-1-max"]);
+  assert.deepEqual(meta.protocols, [{ name: "openai_video", models: ["ray-3.2"] }, { name: "openai_image", models: ["uni-1", "uni-1-max"] }]);
 });
