@@ -11,9 +11,3 @@ locale: "zh-CN"
 ### Changed
 
 - 仓库新增宿主 fixture 测试 `test/golden.json`，可用 `new-api plugin test --fixture` 重放。请求、模型和计费均无变化。
-
-## [1.0.1]
-
-### Changed
-
-- 插件作者名和链接改为维护者更名后的 GitHub 账号。请求、模型和计费均无变化。
