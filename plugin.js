@@ -50,14 +50,14 @@ const MAX_CREDITS = 4320;
 
 export const meta = {
   "apiVersion": 1,
-  "key": "luma",
+  "key": "changeyu0229_luma",
   "name": "Luma",
   "icon": "Luma.Color",
   "description": {
     "en": "Luma Ray 3.2 video (text-to-video, image-to-video, keyframes, extension, editing, and reframing) and uni-1 image generation and editing",
     "zh": "Luma Ray 3.2 视频（文生视频、图生视频、关键帧、视频延长、视频编辑、画幅重构）与 uni-1 图片生成和编辑"
   },
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": {
     "name": "ByAiden",
     "url": "https://github.com/ByAiden"
