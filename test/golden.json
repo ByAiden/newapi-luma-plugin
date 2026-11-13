@@ -1,0 +1,319 @@
+{
+  "cases": [
+    {
+      "name": "video request sends the mapped model",
+      "hook": "buildSubmitRequest",
+      "args": [
+        {
+          "requestBody": {
+            "type": "video",
+            "prompt": "A fox in snow",
+            "video": {
+              "resolution": "720p",
+              "duration": "5s"
+            },
+            "model": "ray-3.2"
+          },
+          "requestHeaders": {
+            "Content-Type": "application/json",
+            "Accept": ""
+          },
+          "action": "text_to_video",
+          "model": "video",
+          "upstreamModel": "ray-3.2",
+          "baseUrl": "https://agents.lumalabs.ai",
+          "apiKey": "test-key",
+          "authHeader": "Bearer test-key",
+          "upstream": {
+            "kind": "vendor"
+          },
+          "config": {},
+          "files": [],
+          "publicTaskId": "task_public"
+        }
+      ],
+      "expected": {
+        "url": "https://agents.lumalabs.ai/v1/generations",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": "Bearer test-key"
+        },
+        "body": {
+          "type": "video",
+          "prompt": "A fox in snow",
+          "video": {
+            "resolution": "720p",
+            "duration": "5s"
+          },
+          "model": "ray-3.2"
+        },
+        "action": "text_to_video"
+      }
+    },
+    {
+      "name": "video reserves credits",
+      "hook": "extractUsage",
+      "args": [
+        {
+          "requestBody": {
+            "type": "video",
+            "prompt": "A fox in snow",
+            "video": {
+              "resolution": "720p",
+              "duration": "5s"
+            },
+            "model": "ray-3.2"
+          },
+          "requestHeaders": {
+            "Content-Type": "application/json",
+            "Accept": ""
+          },
+          "action": "text_to_video",
+          "model": "ray-3.2",
+          "upstreamModel": "ray-3.2",
+          "baseUrl": "https://agents.lumalabs.ai",
+          "apiKey": "test-key",
+          "authHeader": "Bearer test-key",
+          "upstream": {
+            "kind": "vendor"
+          },
+          "config": {},
+          "files": [],
+          "publicTaskId": "task_public"
+        }
+      ],
+      "expected": {
+        "credits": 100
+      }
+    },
+    {
+      "name": "image request",
+      "hook": "buildSubmitRequest",
+      "args": [
+        {
+          "requestBody": {
+            "type": "image",
+            "prompt": "A cat",
+            "model": "uni-1"
+          },
+          "requestHeaders": {
+            "Content-Type": "application/json",
+            "Accept": ""
+          },
+          "action": "text_to_image",
+          "model": "uni-1",
+          "upstreamModel": "uni-1",
+          "baseUrl": "https://agents.lumalabs.ai",
+          "apiKey": "test-key",
+          "authHeader": "Bearer test-key",
+          "upstream": {
+            "kind": "vendor"
+          },
+          "config": {},
+          "files": [],
+          "publicTaskId": "task_public"
+        }
+      ],
+      "expected": {
+        "url": "https://agents.lumalabs.ai/v1/generations",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": "Bearer test-key"
+        },
+        "body": {
+          "type": "image",
+          "prompt": "A cat",
+          "model": "uni-1"
+        },
+        "action": "text_to_image"
+      }
+    },
+    {
+      "name": "submit keeps the generation id",
+      "hook": "parseSubmitResponse",
+      "args": [
+        {},
+        {
+          "statusCode": 201,
+          "headers": {},
+          "body": {
+            "id": "luma-1",
+            "state": "queued",
+            "output": []
+          }
+        }
+      ],
+      "expected": {
+        "taskId": "luma-1",
+        "taskData": {
+          "id": "luma-1",
+          "state": "queued",
+          "output": []
+        }
+      }
+    },
+    {
+      "name": "submit without id fails",
+      "hook": "parseSubmitResponse",
+      "args": [
+        {},
+        {
+          "statusCode": 201,
+          "headers": {},
+          "body": {}
+        }
+      ],
+      "expectedError": "generation id"
+    },
+    {
+      "name": "queued",
+      "hook": "parseTaskResult",
+      "args": [
+        {
+          "taskId": "luma-1",
+          "model": "ray-3.2",
+          "upstreamModel": "ray-3.2",
+          "baseUrl": "https://agents.lumalabs.ai",
+          "apiKey": "test-key",
+          "authHeader": "Bearer test-key",
+          "upstream": {
+            "kind": "vendor"
+          }
+        },
+        {
+          "state": "queued"
+        },
+        {
+          "status": 200,
+          "headers": {}
+        }
+      ],
+      "expected": {
+        "status": "QUEUED"
+      }
+    },
+    {
+      "name": "completed",
+      "hook": "parseTaskResult",
+      "args": [
+        {
+          "taskId": "luma-1",
+          "model": "ray-3.2",
+          "upstreamModel": "ray-3.2",
+          "baseUrl": "https://agents.lumalabs.ai",
+          "apiKey": "test-key",
+          "authHeader": "Bearer test-key",
+          "upstream": {
+            "kind": "vendor"
+          }
+        },
+        {
+          "id": "luma-1",
+          "state": "completed",
+          "output": [
+            {
+              "type": "video",
+              "url": "https://cdn.example/v.mp4"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "headers": {}
+        }
+      ],
+      "expected": {
+        "status": "SUCCESS"
+      }
+    },
+    {
+      "name": "completed without output fails",
+      "hook": "parseTaskResult",
+      "args": [
+        {
+          "taskId": "luma-1",
+          "model": "ray-3.2",
+          "upstreamModel": "ray-3.2",
+          "baseUrl": "https://agents.lumalabs.ai",
+          "apiKey": "test-key",
+          "authHeader": "Bearer test-key",
+          "upstream": {
+            "kind": "vendor"
+          }
+        },
+        {
+          "state": "completed",
+          "output": []
+        },
+        {
+          "status": 200,
+          "headers": {}
+        }
+      ],
+      "expected": {
+        "status": "FAILURE",
+        "reason": "Luma returned no output"
+      }
+    },
+    {
+      "name": "unknown state is UNKNOWN",
+      "hook": "parseTaskResult",
+      "args": [
+        {
+          "taskId": "luma-1",
+          "model": "ray-3.2",
+          "upstreamModel": "ray-3.2",
+          "baseUrl": "https://agents.lumalabs.ai",
+          "apiKey": "test-key",
+          "authHeader": "Bearer test-key",
+          "upstream": {
+            "kind": "vendor"
+          }
+        },
+        {
+          "state": "teleporting"
+        },
+        {
+          "status": 200,
+          "headers": {}
+        }
+      ],
+      "expected": {
+        "status": "UNKNOWN",
+        "reason": "unrecognized state: teleporting"
+      }
+    },
+    {
+      "name": "artifacts of a finished video",
+      "hook": "listArtifacts",
+      "args": [
+        {
+          "taskId": "luma-1",
+          "status": "SUCCESS",
+          "action": "video",
+          "data": {
+            "id": "luma-1",
+            "state": "completed",
+            "output": [
+              {
+                "type": "video",
+                "url": "https://cdn.example/v.mp4"
+              }
+            ]
+          }
+        }
+      ],
+      "expected": [
+        {
+          "key": "video",
+          "type": "video",
+          "mimeType": "video/mp4"
+        }
+      ]
+    }
+  ]
+}

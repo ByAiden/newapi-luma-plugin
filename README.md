@@ -10,7 +10,7 @@ Generates, extends, edits and reframes videos with Luma's Ray 3.2 model, and gen
 
 ## Channel setup
 
-- Install the plugin, then add a channel of the Task Plugin type and bind it to `changeyu0229_luma`.
+- Install the plugin, then add a channel of the Task Plugin type and bind it to `luma`.
 - The key is a Luma Agents API key from the [Luma API Platform](https://platform.lumalabs.ai/). These keys start with `luma-api-`. One key serves both video and image models.
 - Leave the API address empty to use `https://agents.lumalabs.ai`. Enter another address only when you reach Luma through a proxy, and leave `/v1` off the end.
 - Add the models you offer to the channel: `ray-3.2`, `uni-1`, `uni-1-max`. A channel can also offer them under other names through model mapping.
@@ -26,7 +26,7 @@ The plugin uses the current Luma Agents API only. Keys and model names of the re
 | `POST /v1/images/generations` | OpenAI Images API: `prompt`, `size`, `output_format`, plus Luma's `aspect_ratio`, `style`, `web_search` and `image_ref` | `uni-1`, `uni-1-max` |
 | `POST /v1/images/edits` | OpenAI image edits: the first `image` is the image to edit and any further images are references | `uni-1`, `uni-1-max` |
 
-The Luma path also works under the plugin's prefix, as `/changeyu0229_luma/v1/generations`. Without a `type`, a request to `ray-3.2` is a video and a request to `uni-1` or `uni-1-max` is an image; a request to a mapped model name needs an explicit `type`.
+The Luma path also works under the plugin's prefix, as `/luma/v1/generations`. Without a `type`, a request to `ray-3.2` is a video and a request to `uni-1` or `uni-1-max` is an image; a request to a mapped model name needs an explicit `type`.
 
 Clients poll a task from the Luma path at `GET /v1/generations/{id}`. The reply keeps Luma's generation object; when the output is done, each `output[].url` is the gateway's download address, which keeps working after Luma's own one-hour link expires. Luma's team and usage details are left out.
 For a task from `POST /v1/videos`, clients poll `GET /v1/videos/{task_id}` and download the file from `GET /v1/videos/{task_id}/content`. The OpenAI Images endpoints wait for the image and answer with its URL, or with base64 data when the request sets `response_format: "b64_json"`.
