@@ -314,6 +314,102 @@
           "mimeType": "video/mp4"
         }
       ]
+    },
+    {
+      "name": "new_api: video goes to the middle gateway",
+      "hook": "buildSubmitRequest",
+      "args": [
+        {
+          "requestBody": {
+            "type": "video",
+            "prompt": "A fox in snow",
+            "video": {
+              "resolution": "720p",
+              "duration": "5s"
+            },
+            "model": "ray-3.2"
+          },
+          "requestHeaders": {
+            "Content-Type": "application/json",
+            "Accept": ""
+          },
+          "action": "text_to_video",
+          "model": "video",
+          "upstreamModel": "ray-3.2",
+          "baseUrl": "https://middle.example",
+          "apiKey": "sk-middle",
+          "authHeader": "Bearer sk-middle",
+          "upstream": {
+            "kind": "new_api"
+          },
+          "config": {},
+          "files": [],
+          "publicTaskId": "task_public"
+        }
+      ],
+      "expected": {
+        "url": "https://middle.example/changeyu0229_luma/v1/generations",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": "Bearer sk-middle"
+        },
+        "body": {
+          "type": "video",
+          "prompt": "A fox in snow",
+          "video": {
+            "resolution": "720p",
+            "duration": "5s"
+          },
+          "model": "ray-3.2"
+        },
+        "action": "text_to_video"
+      }
+    },
+    {
+      "name": "new_api: image goes to the middle gateway",
+      "hook": "buildSubmitRequest",
+      "args": [
+        {
+          "requestBody": {
+            "type": "image",
+            "prompt": "A cat",
+            "model": "uni-1"
+          },
+          "requestHeaders": {
+            "Content-Type": "application/json",
+            "Accept": ""
+          },
+          "action": "text_to_image",
+          "model": "uni-1",
+          "upstreamModel": "uni-1",
+          "baseUrl": "https://middle.example",
+          "apiKey": "sk-middle",
+          "authHeader": "Bearer sk-middle",
+          "upstream": {
+            "kind": "new_api"
+          },
+          "config": {},
+          "files": [],
+          "publicTaskId": "task_public"
+        }
+      ],
+      "expected": {
+        "url": "https://middle.example/changeyu0229_luma/v1/generations",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": "Bearer sk-middle"
+        },
+        "body": {
+          "type": "image",
+          "prompt": "A cat",
+          "model": "uni-1"
+        },
+        "action": "text_to_image"
+      }
     }
   ]
 }

@@ -28,7 +28,7 @@ The plugin uses the current Luma Agents API only. Keys and model names of the re
 
 The Luma path also works under the plugin's prefix, as `/changeyu0229_luma/v1/generations`. Without a `type`, a request to `ray-3.2` is a video and a request to `uni-1` or `uni-1-max` is an image; a request to a mapped model name needs an explicit `type`.
 
-Clients poll a task from the Luma path at `GET /v1/generations/{id}`. The reply keeps Luma's generation object; when the output is done, each `output[].url` is the gateway's download address, which keeps working after Luma's own one-hour link expires. Luma's team and usage details are left out.
+Clients poll a task from the Luma path at `GET /v1/generations/{id}`. The reply keeps Luma's generation object; when the output is done, each `output[].url` is the gateway's download address, which keeps working after Luma's own one-hour link expires. Luma's team details are left out; of the usage only `credits_charged` is kept.
 For a task from `POST /v1/videos`, clients poll `GET /v1/videos/{task_id}` and download the file from `GET /v1/videos/{task_id}/content`. The OpenAI Images endpoints wait for the image and answer with its URL, or with base64 data when the request sets `response_format: "b64_json"`.
 
 To extend, edit or reframe an earlier video, or edit an earlier image, pass the gateway task id of that output as `generation_id`, for example `"video": {"start_frame": {"generation_id": "task_..."}}` or `"source": {"generation_id": "task_..."}`. The gateway checks that the task belongs to the caller and sends Luma's own id upstream.
@@ -69,6 +69,18 @@ curl https://your-gateway.example.com/v1/images/generations \
   -H "Content-Type: application/json" \
   -d '{"model": "uni-1", "prompt": "A paper boat on a calm pond, watercolor", "size": "1024x1024"}'
 ```
+
+## Through another New API gateway
+
+A second gateway can sell Luma through yours. Install this plugin, at the same version, on both gateways:
+
+- On the gateway that calls Luma, set up the Task Plugin channel above.
+- On the other gateway, create a **New API** channel (type 60). Its base URL is the first gateway's address and its key is a token from the first gateway. Pick `changeyu0229_luma` under Upstream task plugins and add the models.
+
+The outer gateway sends Luma's own requests to the first gateway's `/changeyu0229_luma/v1/generations` path with the token as a Bearer key and polls them there. Outputs download through the first gateway's download addresses, so set its server address (`ServerAddress`) to an address that the outer gateway, and clients of the OpenAI Images endpoints, can reach: those endpoints answer with the first gateway's image address, as they answer with Luma's own URL otherwise. Each gateway bills its own users with its own task expressions; the expression above works on both.
+
+- Both gateways settle on the credits Luma reports: the first gateway's reply now passes on `usage.credits_charged`.
+- Extending, editing or reframing an earlier output works with the outer gateway's task id; the outer gateway sends the first gateway's id upstream.
 
 ## Limits
 

@@ -27,7 +27,7 @@ locale: zh-CN
 
 Luma 路径也可以加插件前缀访问，即 `/changeyu0229_luma/v1/generations`。不写 `type` 时，`ray-3.2` 默认生成视频，`uni-1`、`uni-1-max` 默认生成图片；使用映射后的模型名时必须写明 `type`。
 
-通过 Luma 路径提交的任务，客户端轮询 `GET /v1/generations/{id}`。返回 Luma 的 generation 对象；完成后每个 `output[].url` 都是网关的下载地址，Luma 自己的链接一小时后过期，网关地址仍然可用。返回内容不包含 Luma 的团队和用量信息。
+通过 Luma 路径提交的任务，客户端轮询 `GET /v1/generations/{id}`。返回 Luma 的 generation 对象；完成后每个 `output[].url` 都是网关的下载地址，Luma 自己的链接一小时后过期，网关地址仍然可用。返回内容不包含 Luma 的团队信息，用量只保留 `credits_charged`。
 通过 `POST /v1/videos` 提交的任务，客户端轮询 `GET /v1/videos/{task_id}`，从 `GET /v1/videos/{task_id}/content` 下载视频。OpenAI 图片接口会等图片生成完再返回图片地址；请求里设置 `response_format: "b64_json"` 时返回 base64 数据。
 
 要延长、编辑或重构之前的视频，或修改之前生成的图片，把那个结果的网关任务 ID 作为 `generation_id` 传入，例如 `"video": {"start_frame": {"generation_id": "task_..."}}` 或 `"source": {"generation_id": "task_..."}`。网关会校验任务属于调用者，再把 Luma 自己的 ID 发给上游。
@@ -68,6 +68,18 @@ curl https://your-gateway.example.com/v1/images/generations \
   -H "Content-Type: application/json" \
   -d '{"model": "uni-1", "prompt": "A paper boat on a calm pond, watercolor", "size": "1024x1024"}'
 ```
+
+## 经由另一个 New API 网关
+
+另一个网关可以通过你的网关转售 Luma。两个网关都要安装本插件的同一版本：
+
+- 直接调用 Luma 的网关按上文创建任务插件渠道。
+- 另一个网关创建 **New API** 渠道（类型 60）：Base URL 填第一个网关的地址，密钥填第一个网关的令牌，在「上游任务插件」中选择 `changeyu0229_luma`，并添加模型。
+
+外层网关把 Luma 原生请求发到第一个网关的 `/changeyu0229_luma/v1/generations` 路径，用令牌作为 Bearer 密钥，并在那里轮询。结果通过第一个网关的下载地址取回，请把它的服务器地址（`ServerAddress`）设成外层网关和 OpenAI Images 接口的客户端都能访问的地址：这些接口返回第一个网关的图片地址，就像直连时返回 Luma 自己的 URL。每个网关用自己的任务表达式向自己的用户计费，上面的表达式在两个网关上都适用。
+
+- 两个网关都按 Luma 报告的积分结算：第一个网关的返回现在会带上 `usage.credits_charged`。
+- 延长、编辑或重构之前的结果时使用外层网关的任务 id，外层网关会把第一个网关的 id 发往上游。
 
 ## 限制
 

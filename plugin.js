@@ -57,7 +57,7 @@ export const meta = {
     "en": "Luma Ray 3.2 video (text-to-video, image-to-video, keyframes, extension, editing, and reframing) and uni-1 image generation and editing",
     "zh": "Luma Ray 3.2 视频（文生视频、图生视频、关键帧、视频延长、视频编辑、画幅重构）与 uni-1 图片生成和编辑"
   },
-  "version": "1.1.1",
+  "version": "1.2.0",
   "author": {
     "name": "ByAiden",
     "url": "https://github.com/ByAiden"
@@ -70,6 +70,10 @@ export const meta = {
     "uni-1-max"
   ],
   "fetchMode": "per_task",
+  "upstreams": [
+    "vendor",
+    "new_api"
+  ],
   "usageSchema": {
     "credits": {
       "type": "number",
@@ -173,6 +177,23 @@ export const meta = {
     }
   ]
 };
+
+// On a New API channel the same plugin answers on another gateway, which
+// serves Luma's paths under the plugin's key and takes the gateway token as
+// the Bearer token.
+const PLUGIN_KEY = "changeyu0229_luma";
+
+function viaGateway(ctx) {
+  return Boolean(ctx.upstream && ctx.upstream.kind === "new_api");
+}
+
+function apiRoot(ctx) {
+  return ctx.baseUrl + (viaGateway(ctx) ? "/" + PLUGIN_KEY : "");
+}
+
+function authorization(ctx) {
+  return viaGateway(ctx) && ctx.authHeader ? ctx.authHeader : "Bearer " + ctx.apiKey;
+}
 
 function trimmed(value) {
   return String(value === undefined || value === null ? "" : value).trim();
@@ -579,7 +600,8 @@ function failureReason(data) {
 }
 
 // Luma's generation object without the account details it carries (team,
-// usage). Output URLs become the gateway's download addresses, which do not
+// usage other than the credits charged, which a gateway in front settles
+// on). Output URLs become the gateway's download addresses, which do not
 // expire after an hour as Luma's presigned URLs do.
 function publicGeneration(data, taskId, artifacts) {
   const object = plainObject(data) || {};
@@ -587,6 +609,9 @@ function publicGeneration(data, taskId, artifacts) {
   for (const key of ["type", "state", "model", "created_at", "failure_reason", "failure_code", "user_id"]) {
     if (object[key] !== undefined) out[key] = object[key];
   }
+  const usage = plainObject(object.usage);
+  const credits = usage ? Number(usage.credits_charged) : 0;
+  if (credits > 0 && Number.isFinite(credits)) out.usage = { credits_charged: credits };
   const output = Array.isArray(object.output) ? object.output : [];
   const keys = outputKeys(output);
   out.output = output.map(function (item, index) {
@@ -636,9 +661,9 @@ export function buildSubmitRequest(ctx) {
   const body = withUpstreamIds(request.body, ctx.originTasks);
   body.model = model;
   return {
-    url: ctx.baseUrl + "/v1/generations",
+    url: apiRoot(ctx) + "/v1/generations",
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: "Bearer " + ctx.apiKey },
+    headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: authorization(ctx) },
     body: body,
     action: request.action,
   };
@@ -660,9 +685,9 @@ export function extractUsage(ctx) {
 
 export function buildQueryRequest(ctx) {
   return {
-    url: ctx.baseUrl + "/v1/generations/" + encodeURIComponent(ctx.taskId),
+    url: apiRoot(ctx) + "/v1/generations/" + encodeURIComponent(ctx.taskId),
     method: "GET",
-    headers: { Accept: "application/json", Authorization: "Bearer " + ctx.apiKey },
+    headers: { Accept: "application/json", Authorization: authorization(ctx) },
   };
 }
 
@@ -713,8 +738,8 @@ export function buildContentRequest(ctx) {
   if (trimmed(ctx.upstreamTaskId)) {
     try {
       const response = utils.fetch({
-        url: ctx.baseUrl + "/v1/generations/" + encodeURIComponent(ctx.upstreamTaskId),
-        headers: { Accept: "application/json", Authorization: "Bearer " + ctx.apiKey },
+        url: apiRoot(ctx) + "/v1/generations/" + encodeURIComponent(ctx.upstreamTaskId),
+        headers: { Accept: "application/json", Authorization: authorization(ctx) },
       });
       if (response.status === 200) url = artifactURL(response.body, ctx.artifactKey);
     } catch (_error) {

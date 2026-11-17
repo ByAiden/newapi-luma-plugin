@@ -195,7 +195,7 @@ test("native replies hide account details and use the gateway download address",
   assert.equal(view.id, "task_1");
   assert.equal(view.state, "completed");
   assert.equal(view.team, undefined);
-  assert.equal(view.usage, undefined);
+  assert.deepEqual(view.usage, { credits_charged: 100 });
   assert.equal(view.output[0].url, "https://gw/v1/videos/task_1/content?sig=1");
   const created = native.generationCreated({}, { task_id: "task_1", status: "SUBMITTED", data: { id: "luma-1", state: "queued", output: [] } });
   assert.deepEqual(created, { id: "task_1", state: "queued", output: [] });
@@ -350,4 +350,81 @@ test("meta is a JSON object literal the marketplace can read without running the
   const start = source.indexOf("export const meta = ") + "export const meta = ".length;
   const literal = source.slice(start, source.indexOf(";\n", start));
   assert.deepEqual(JSON.parse(literal), JSON.parse(JSON.stringify(meta)));
+});
+
+test("PLUGIN_KEY matches meta.key and new_api is declared", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../plugin.js", import.meta.url), "utf8");
+  assert.equal(source.match(/const PLUGIN_KEY = "([^"]+)";/)[1], meta.key);
+  assert.deepEqual(meta.upstreams, ["vendor", "new_api"]);
+});
+
+// The middle gateway runs this plugin too: the driver addresses its native
+// routes under /{key} with the gateway token and reads what the middle's own
+// presenters render.
+const MIDDLE = "https://middle.example";
+const viaGateway = { baseUrl: MIDDLE, apiKey: "sk-middle", authHeader: "Bearer sk-middle", upstream: { kind: "new_api" } };
+
+test("new_api: video submit, query, settlement and content through the middle gateway", () => {
+  const intent = decodeNative({ model: "ray-3.2", prompt: "A fox", video: { resolution: "1080p", duration: "10s" } });
+  const request = plugin.buildSubmitRequest(driver(intent, viaGateway));
+  assert.equal(request.url, MIDDLE + "/" + meta.key + "/v1/generations");
+  assert.equal(request.headers.Authorization, "Bearer sk-middle");
+  // The middle plugin decodes the body the outer layer sends and reserves the same credits.
+  const middle = decodeNative(request.body);
+  assert.deepEqual(plugin.extractUsage(driver(middle)), plugin.extractUsage(driver(intent, viaGateway)));
+  assert.equal(plugin.extractUsage(driver(middle)).credits, 1200);
+  const created = native.generationCreated({}, { task_id: "task_mid", status: "SUBMITTED", data: { id: "luma-1", state: "queued", output: [] } });
+  assert.equal(plugin.parseSubmitResponse(driver(intent, viaGateway), { statusCode: 200, headers: {}, body: created }).taskId, "task_mid");
+  const q = Object.assign({ taskId: "task_mid", model: "ray-3.2", upstreamModel: "ray-3.2" }, viaGateway);
+  const queryRequest = plugin.buildQueryRequest(q);
+  assert.equal(queryRequest.url, MIDDLE + "/" + meta.key + "/v1/generations/task_mid");
+  assert.equal(queryRequest.headers.Authorization, "Bearer sk-middle");
+  const rendered = native.generationStatus({ artifacts: { video: { key: "video", type: "video", url: "https://middle.example/signed/video" } } }, { task_id: "task_mid", status: "SUCCESS", data: COMPLETED });
+  assert.equal(rendered.team, undefined);
+  assert.deepEqual(rendered.usage, { credits_charged: 100 });
+  const result = plugin.parseTaskResult(q, rendered, { status: 200 });
+  assert.deepEqual(result, { status: "SUCCESS" });
+  // The outer layer settles on the same facts as the middle layer.
+  assert.deepEqual(plugin.extractUsageOnComplete(q, result, rendered), plugin.extractUsageOnComplete({}, result, COMPLETED));
+  assert.deepEqual(plugin.listArtifacts({ status: "SUCCESS", data: rendered }), [{ key: "video", type: "video", mimeType: "video/mp4" }]);
+  const seen = [];
+  fetchImpl = (req) => {
+    seen.push(req);
+    return { status: 200, body: rendered };
+  };
+  const content = plugin.buildContentRequest(Object.assign({}, q, { upstreamTaskId: "task_mid", artifactKey: "video", clientRequest: { method: "GET" }, data: rendered }));
+  assert.deepEqual(content, { url: "https://middle.example/signed/video", method: "GET", credentialless: true });
+  assert.equal(seen[0].url, MIDDLE + "/" + meta.key + "/v1/generations/task_mid");
+  assert.equal(seen[0].headers.Authorization, "Bearer sk-middle");
+  fetchImpl = () => {
+    throw new Error("utils.fetch is not available");
+  };
+  const failed = native.generationStatus({ artifacts: {} }, { task_id: "task_mid", status: "FAILURE", fail_reason: "timeout", data: { id: "luma-1", state: "processing", output: [] } });
+  assert.equal(plugin.parseTaskResult(q, failed, { status: 200 }).status, "FAILURE");
+});
+
+test("new_api: extending a generation names the middle gateway's task id", () => {
+  const intent = decodeNative({ model: "ray-3.2", prompt: "more", video: { start_frame: { generation_id: "task_outer_1" } } });
+  assert.deepEqual(intent.originTaskIds, ["task_outer_1"]);
+  // The outer gateway's origin task holds the middle gateway's public id as its upstream id.
+  const request = plugin.buildSubmitRequest(driver(intent, Object.assign({ originTasks: [{ taskId: "task_outer_1", upstreamTaskId: "task_mid_1" }] }, viaGateway)));
+  assert.deepEqual(request.body.video.start_frame, { generation_id: "task_mid_1" });
+  assert.deepEqual(decodeNative(request.body).originTaskIds, ["task_mid_1"]);
+});
+
+test("new_api: images read the middle's rendered generation", () => {
+  const intent = decodeNative({ model: "uni-1", prompt: "A cat" });
+  const request = plugin.buildSubmitRequest(driver(intent, viaGateway));
+  assert.equal(request.url, MIDDLE + "/" + meta.key + "/v1/generations");
+  const rendered = native.generationStatus({ artifacts: { "image-1": { url: "https://middle.example/signed/img" } } }, { task_id: "task_img", status: "SUCCESS", data: IMAGE_DONE });
+  assert.deepEqual(plugin.extractUsageOnComplete({}, { status: "SUCCESS" }, rendered), { credits: 14 });
+  assert.deepEqual(protocols.openai_image.render({}, { status: "SUCCESS", data: rendered }), { data: [{ url: "https://middle.example/signed/img" }] });
+});
+
+test("a missing ctx.upstream means the vendor", () => {
+  const intent = decodeNative({ model: "uni-1", prompt: "A cat" });
+  const ctx = driver(intent);
+  delete ctx.upstream;
+  assert.equal(plugin.buildSubmitRequest(ctx).url, BASE + "/v1/generations");
 });
